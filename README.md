@@ -59,16 +59,16 @@ graph TD
 *   **Notion Page ID:** Ensure you have shared your Notion page with the integration.
 
 #### Installation
-1.  Clone this repository.
-2.  Install dependencies:
+1.  Clone this repository into your home directory:
     ```bash
-    pnpm install
+    git clone https://github.com/knguyen1411b/notion-mcp.git ~/notion-mcp
+    cd ~/notion-mcp
     ```
-3.  Copy `.env.example` to `.env` and fill in your keys:
+2.  Copy `.env.example` to `.env` and fill in your keys:
     ```bash
     cp .env.example .env
     ```
-4.  Build the project:
+3.  Build the project:
     ```bash
     pnpm build
     ```
@@ -82,7 +82,7 @@ Add this to your `claude_desktop_config.json` (found in `%APPDATA%\Claude\claude
   "mcpServers": {
     "notion-ai-mcp": {
       "command": "node",
-      "args": ["D:/WorkSpace/Projects/notion-ai/dist/index.js"],
+      "args": ["~/notion-mcp/dist/index.js"],
       "env": {
         "NOTION_API_KEY": "your_notion_api_key",
         "NOTION_PAGE_ID": "your_notion_page_id"
@@ -91,24 +91,24 @@ Add this to your `claude_desktop_config.json` (found in `%APPDATA%\Claude\claude
   }
 }
 ```
-*(Adjust the path in `args` to match where you cloned the repository).*
+*(Note: Claude Desktop requires absolute paths, so replace ~ with your actual home directory path, e.g., C:/Users/username/notion-mcp/dist/index.js on Windows or /Users/username/notion-mcp/dist/index.js on macOS).*
 
 ##### 2. Cursor
 Go to **Settings** > **Features** > **MCP** and click **+ Add New MCP Server**:
 *   **Name:** `Notion AI MCP`
 *   **Type:** `stdio`
-*   **Command:** `node D:/WorkSpace/Projects/notion-ai/dist/index.js`
+*   **Command:** `node ~/notion-mcp/dist/index.js`
 
 ##### 3. Codex
 You can add it via Codex CLI:
 ```bash
-codex mcp add notion-ai-mcp --node D:/WorkSpace/Projects/notion-ai/dist/index.js
+codex mcp add notion-ai-mcp --node ~/notion-mcp/dist/index.js
 ```
 Or insert this into your `~/.codex/config.toml` config file:
 ```toml
 [mcp.servers.notion-ai-mcp]
 command = "node"
-args = ["D:/WorkSpace/Projects/notion-ai/dist/index.js"]
+args = ["~/notion-mcp/dist/index.js"]
 
 [mcp.servers.notion-ai-mcp.env]
 NOTION_API_KEY = "your_notion_api_key"
@@ -156,17 +156,17 @@ Tích hợp giao thức **Model Context Protocol (MCP)** cho Notion. Server này
 *   **Notion Page ID:** Đảm bảo trang Notion cần thao tác đã được thêm Connection (chọn Integration tương ứng).
 
 #### Các bước cài đặt
-1.  Tải mã nguồn (Clone repository) về máy.
-2.  Cài đặt các gói phụ thuộc:
+1.  Tải mã nguồn (Clone repository) về máy của bạn (khuyên dùng thư mục Home `~/notion-mcp`):
     ```bash
-    pnpm install
+    git clone https://github.com/knguyen1411b/notion-mcp.git ~/notion-mcp
+    cd ~/notion-mcp
     ```
-3.  Tạo file `.env` từ file mẫu:
+2.  Tạo file `.env` từ file mẫu:
     ```bash
     cp .env.example .env
     ```
     Mở file `.env` và điền khóa API cũng như Page ID của bạn.
-4.  Biên dịch dự án:
+3.  Biên dịch dự án:
     ```bash
     pnpm build
     ```
@@ -180,7 +180,7 @@ Mở file cấu hình `claude_desktop_config.json` (Đường dẫn trên Window
   "mcpServers": {
     "notion-ai-mcp": {
       "command": "node",
-      "args": ["D:/WorkSpace/Projects/notion-ai/dist/index.js"],
+      "args": ["~/notion-mcp/dist/index.js"],
       "env": {
         "NOTION_API_KEY": "your_notion_api_key",
         "NOTION_PAGE_ID": "your_notion_page_id"
@@ -189,24 +189,24 @@ Mở file cấu hình `claude_desktop_config.json` (Đường dẫn trên Window
   }
 }
 ```
-*(Hãy điều chỉnh đường dẫn tuyệt đối trong `args` cho khớp với vị trí thư mục dự án trên máy của bạn).*
+*(Lưu ý: Claude Desktop yêu cầu đường dẫn tuyệt đối, hãy thay thế `~/` bằng đường dẫn thư mục Home thực tế của bạn, ví dụ: `C:/Users/ten-user/notion-mcp/dist/index.js` trên Windows hoặc `/Users/ten-user/notion-mcp/dist/index.js` trên macOS).*
 
 ##### 2. Cursor
 Truy cập **Settings** > **Features** > **MCP** và chọn **+ Add New MCP Server**:
 *   **Name:** `Notion AI MCP`
 *   **Type:** chọn `stdio`
-*   **Command:** `node D:/WorkSpace/Projects/notion-ai/dist/index.js`
+*   **Command:** `node ~/notion-mcp/dist/index.js`
 
 ##### 3. Codex
 Bạn có thể tích hợp qua Codex CLI:
 ```bash
-codex mcp add notion-ai-mcp --node D:/WorkSpace/Projects/notion-ai/dist/index.js
+codex mcp add notion-ai-mcp --node ~/notion-mcp/dist/index.js
 ```
 Hoặc cấu hình trực tiếp vào file `~/.codex/config.toml`:
 ```toml
 [mcp.servers.notion-ai-mcp]
 command = "node"
-args = ["D:/WorkSpace/Projects/notion-ai/dist/index.js"]
+args = ["~/notion-mcp/dist/index.js"]
 
 [mcp.servers.notion-ai-mcp.env]
 NOTION_API_KEY = "your_notion_api_key"
