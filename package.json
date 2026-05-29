@@ -2,25 +2,32 @@
   "name": "notion-ai",
   "version": "1.0.0",
   "description": "Custom Notion AI integration",
-  "main": "index.js",
+  "main": "dist/index.js",
   "type": "module",
   "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
     "test-connection": "tsx src/scripts/test-connection.ts",
     "read": "tsx src/scripts/read-page.ts",
     "write": "tsx src/scripts/write-section.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky"
   },
   "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@modelcontextprotocol/server": "2.0.0-alpha.2",
     "@notionhq/client": "^5.22.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.9.1",
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
     "prettier": "^3.8.3",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",

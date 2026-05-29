@@ -1,5 +1,13 @@
-import { notion, pageId } from '../utils/notion.js';
+import { getNotionClient, getDefaultPageId } from '../utils/notion.js';
 import { isFullPage } from '@notionhq/client';
+
+const pageId = getDefaultPageId() || '';
+if (!pageId) {
+  console.error('❌ Lỗi: NOTION_PAGE_ID chưa được cấu hình đúng trong file .env');
+  process.exit(1);
+}
+
+const notion = getNotionClient();
 
 console.log(`🔌 Đang kết nối tới Notion với Page ID: ${pageId}...`);
 

@@ -1,65 +1,13 @@
-import { notion, pageId, getBlocks, parseRichText } from '../utils/notion.js';
+import { getNotionClient, getDefaultPageId, getBlocks, renderBlocks } from '../utils/notion.js';
 import { isFullPage } from '@notionhq/client';
-import { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
 
-async function renderBlocks(blocks: BlockObjectResponse[], indentLevel = 0): Promise<string> {
-  let output = '';
-  const indent = '  '.repeat(indentLevel);
-
-  for (const block of blocks) {
-    const type = block.type;
-    const value = (block as any)[type];
-
-    let text = '';
-    if (value && value.rich_text) {
-      text = parseRichText(value.rich_text);
-    }
-
-    let blockStr = '';
-    switch (type) {
-      case 'paragraph':
-        if (text) blockStr = `${indent}${text}\n\n`;
-        break;
-      case 'heading_1':
-        blockStr = `${indent}# ${text}\n\n`;
-        break;
-      case 'heading_2':
-        blockStr = `${indent}## ${text}\n\n`;
-        break;
-      case 'heading_3':
-        blockStr = `${indent}### ${text}\n\n`;
-        break;
-      case 'bulleted_list_item':
-        blockStr = `${indent}* ${text}\n`;
-        break;
-      case 'numbered_list_item':
-        blockStr = `${indent}1. ${text}\n`;
-        break;
-      case 'to_do': {
-        const checked = value.checked ? '[x]' : '[ ]';
-        blockStr = `${indent}${checked} ${text}\n`;
-        break;
-      }
-      case 'quote':
-        blockStr = `${indent}> ${text}\n\n`;
-        break;
-      case 'code':
-        blockStr = `${indent}\`\`\`${value.language || ''}\n${indent}${text}\n${indent}\`\`\`\n\n`;
-        break;
-      default:
-        if (text) blockStr = `${indent}${text}\n\n`;
-        break;
-    }
-
-    output += blockStr;
-
-    if (block.has_children) {
-      const children = await getBlocks(block.id);
-      output += await renderBlocks(children, indentLevel + 1);
-    }
-  }
-  return output;
+const pageId = getDefaultPageId() || '';
+if (!pageId) {
+  console.error('❌ Lỗi: NOTION_PAGE_ID chưa được cấu hình đúng trong file .env');
+  process.exit(1);
 }
+
+const notion = getNotionClient();
 
 async function main() {
   try {
@@ -81,8 +29,8 @@ async function main() {
 
     console.log(`\n=================== ${title.toUpperCase()} ===================\n`);
 
-    const blocks = await getBlocks(pageId);
-    const markdown = await renderBlocks(blocks);
+    const blocks = await getBlocks(notion, pageId);
+    const markdown = await renderBlocks(notion, blocks);
 
     console.log(markdown);
     console.log('================================================================');

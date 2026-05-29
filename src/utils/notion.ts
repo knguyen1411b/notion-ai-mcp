@@ -4,46 +4,55 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const apiKey = process.env.NOTION_API_KEY;
-const rawPageId = process.env.NOTION_PAGE_ID;
-
-if (!apiKey || !apiKey.startsWith('ntn_')) {
-  console.error(
-    '❌ Lỗi: NOTION_API_KEY chưa được cấu hình đúng trong file .env (phải bắt đầu bằng ntn_)'
-  );
-  process.exit(1);
-}
-
-if (!rawPageId) {
-  console.error('❌ Lỗi: NOTION_PAGE_ID chưa được cấu hình trong file .env');
-  process.exit(1);
-}
-
-// Clean page ID (remove hyphens or extract from URL if user pasted a full URL)
-let cleaned = rawPageId.trim();
-if (cleaned.includes('notion.so/')) {
-  const parts = cleaned.split('/');
-  const lastPart = parts[parts.length - 1];
-  const match = lastPart.match(/[a-f0-9]{32}/);
-  if (match) {
-    cleaned = match[0];
-  } else {
-    const alphanumeric = lastPart.replace(/[^a-f0-9]/gi, '');
-    if (alphanumeric.length >= 32) {
-      cleaned = alphanumeric.slice(-32);
+/**
+ * Clean a page ID or extract it from a full Notion URL
+ */
+export function cleanPageId(id: string): string {
+  let cleaned = id.trim();
+  if (cleaned.includes('notion.so/')) {
+    const parts = cleaned.split('/');
+    const lastPart = parts[parts.length - 1];
+    const match = lastPart.match(/[a-f0-9]{32}/);
+    if (match) {
+      cleaned = match[0];
+    } else {
+      const alphanumeric = lastPart.replace(/[^a-f0-9]/gi, '');
+      if (alphanumeric.length >= 32) {
+        cleaned = alphanumeric.slice(-32);
+      }
     }
+  } else {
+    cleaned = cleaned.replace(/-/g, '');
   }
-} else {
-  cleaned = cleaned.replace(/-/g, '');
+  return cleaned;
 }
 
-export const pageId = cleaned;
-export const notion = new Client({ auth: apiKey });
+/**
+ * Get the default page ID from environment variables
+ */
+export function getDefaultPageId(): string | null {
+  const rawPageId = process.env.NOTION_PAGE_ID;
+  if (!rawPageId) return null;
+  return cleanPageId(rawPageId);
+}
+
+/**
+ * Get a Notion client instance
+ */
+export function getNotionClient(customApiKey?: string): Client {
+  const apiKey = customApiKey || process.env.NOTION_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'NOTION_API_KEY không tồn tại. Đảm bảo cấu hình trong file .env hoặc truyền vào tham số.'
+    );
+  }
+  return new Client({ auth: apiKey });
+}
 
 /**
  * Fetch all blocks under a parent block recursively (paginated)
  */
-export async function getBlocks(blockId: string): Promise<BlockObjectResponse[]> {
+export async function getBlocks(notion: Client, blockId: string): Promise<BlockObjectResponse[]> {
   const blocks: BlockObjectResponse[] = [];
   let cursor: string | undefined = undefined;
 
@@ -69,18 +78,22 @@ export async function getBlocks(blockId: string): Promise<BlockObjectResponse[]>
 /**
  * Fetch all child blocks of a parent block
  */
-export async function getChildBlocks(blockId: string): Promise<BlockObjectResponse[]> {
-  return getBlocks(blockId);
+export async function getChildBlocks(
+  notion: Client,
+  blockId: string
+): Promise<BlockObjectResponse[]> {
+  return getBlocks(notion, blockId);
 }
 
 /**
  * Find a heading block that matches a query
  */
 export async function findHeadingBlock(
+  notion: Client,
   parentBlockId: string,
   headingTextQuery: string
 ): Promise<BlockObjectResponse | null> {
-  const blocks = await getChildBlocks(parentBlockId);
+  const blocks = await getChildBlocks(notion, parentBlockId);
   const query = headingTextQuery.toLowerCase().trim();
 
   for (const block of blocks) {
@@ -112,4 +125,70 @@ export function parseRichText(richTextArray: any[]): string {
       return text;
     })
     .join('');
+}
+
+/**
+ * Recursively renders Notion blocks to Markdown format
+ */
+export async function renderBlocks(
+  notion: Client,
+  blocks: BlockObjectResponse[],
+  indentLevel = 0
+): Promise<string> {
+  let output = '';
+  const indent = '  '.repeat(indentLevel);
+
+  for (const block of blocks) {
+    const type = block.type;
+    const value = (block as any)[type];
+
+    let text = '';
+    if (value && value.rich_text) {
+      text = parseRichText(value.rich_text);
+    }
+
+    let blockStr = '';
+    switch (type) {
+      case 'paragraph':
+        if (text) blockStr = `${indent}${text}\n\n`;
+        break;
+      case 'heading_1':
+        blockStr = `${indent}# ${text}\n\n`;
+        break;
+      case 'heading_2':
+        blockStr = `${indent}## ${text}\n\n`;
+        break;
+      case 'heading_3':
+        blockStr = `${indent}### ${text}\n\n`;
+        break;
+      case 'bulleted_list_item':
+        blockStr = `${indent}* ${text}\n`;
+        break;
+      case 'numbered_list_item':
+        blockStr = `${indent}1. ${text}\n`;
+        break;
+      case 'to_do': {
+        const checked = value.checked ? '[x]' : '[ ]';
+        blockStr = `${indent}${checked} ${text}\n`;
+        break;
+      }
+      case 'quote':
+        blockStr = `${indent}> ${text}\n\n`;
+        break;
+      case 'code':
+        blockStr = `${indent}\`\`\`${value.language || ''}\n${indent}${text}\n${indent}\`\`\`\n\n`;
+        break;
+      default:
+        if (text) blockStr = `${indent}${text}\n\n`;
+        break;
+    }
+
+    output += blockStr;
+
+    if (block.has_children) {
+      const children = await getBlocks(notion, block.id);
+      output += await renderBlocks(notion, children, indentLevel + 1);
+    }
+  }
+  return output;
 }

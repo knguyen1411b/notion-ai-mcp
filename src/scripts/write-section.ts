@@ -1,6 +1,19 @@
-import { notion, pageId, getChildBlocks, findHeadingBlock } from '../utils/notion.js';
+import {
+  getNotionClient,
+  getDefaultPageId,
+  getChildBlocks,
+  findHeadingBlock,
+} from '../utils/notion.js';
 import { parseMarkdownToBlocks } from '../utils/markdown.js';
 import fs from 'fs';
+
+const pageId = getDefaultPageId() || '';
+if (!pageId) {
+  console.error('❌ Lỗi: NOTION_PAGE_ID chưa được cấu hình đúng trong file .env');
+  process.exit(1);
+}
+
+const notion = getNotionClient();
 
 async function main() {
   const args = process.argv.slice(2);
@@ -28,7 +41,7 @@ async function main() {
 
   try {
     console.log(`🔍 Đang tìm tiêu đề chứa cụm từ: "${headingQuery}"...`);
-    const headingBlock = await findHeadingBlock(pageId, headingQuery);
+    const headingBlock = await findHeadingBlock(notion, pageId, headingQuery);
 
     if (!headingBlock) {
       console.error(`❌ Không tìm thấy tiêu đề nào chứa cụm từ: "${headingQuery}" trên trang.`);
@@ -42,7 +55,7 @@ async function main() {
 
     // Fetch existing children of this block
     console.log('🗑️  Đang kiểm tra và xóa nội dung cũ của phần này...');
-    const children = await getChildBlocks(headingBlock.id);
+    const children = await getChildBlocks(notion, headingBlock.id);
     for (const child of children) {
       await notion.blocks.delete({ block_id: child.id });
     }
@@ -51,7 +64,7 @@ async function main() {
     }
 
     // Parse markdown to Notion blocks
-    console.log('✍️  Đang biên dịch nội dung mới và ghi vào Notion...');
+    console.log('✍️  Đang biên dịch nội dung mới và ghi vào Notion......');
     const newBlocks = parseMarkdownToBlocks(markdownContent);
 
     // Notion API allows appending max 100 blocks at once
