@@ -116,12 +116,19 @@ export async function findHeadingBlock(
  * Convert Notion rich text array to simple markdown/text
  */
 export function parseRichText(richTextArray: any[]): string {
+  if (!richTextArray || !Array.isArray(richTextArray)) return '';
   return richTextArray
     .map((t) => {
       let text = t.plain_text;
-      if (t.annotations.bold) text = `**${text}**`;
-      if (t.annotations.italic) text = `*${text}*`;
-      if (t.annotations.code) text = `\`${text}\``;
+      const isBold = t.annotations?.bold;
+      const isItalic = t.annotations?.italic;
+      const isCode = t.annotations?.code;
+      const url = t.text?.link?.url || t.href;
+
+      if (isBold) text = `**${text}**`;
+      if (isItalic) text = `*${text}*`;
+      if (isCode) text = `\`${text}\``;
+      if (url) text = `[${text}](${url})`;
       return text;
     })
     .join('');
@@ -177,6 +184,35 @@ export async function renderBlocks(
         break;
       case 'code':
         blockStr = `${indent}\`\`\`${value.language || ''}\n${indent}${text}\n${indent}\`\`\`\n\n`;
+        break;
+      case 'divider':
+        blockStr = `${indent}---\n\n`;
+        break;
+      case 'image': {
+        const imgType = value.type;
+        const url = imgType === 'external' ? value.external?.url : value.file?.url;
+        const captionText = value.caption ? parseRichText(value.caption) : '';
+        if (url) {
+          blockStr = `${indent}![${captionText}](${url})\n\n`;
+        }
+        break;
+      }
+      case 'callout': {
+        const emoji = value.icon?.type === 'emoji' ? value.icon.emoji + ' ' : '';
+        blockStr = `${indent}> ${emoji}${text}\n\n`;
+        break;
+      }
+      case 'bookmark':
+        blockStr = `${indent}[${value.url}](${value.url})\n\n`;
+        break;
+      case 'child_page':
+        blockStr = `${indent}[Page: ${value.title}](https://notion.so/${block.id.replace(/-/g, '')})\n\n`;
+        break;
+      case 'child_database':
+        blockStr = `${indent}[Database: ${value.title}](https://notion.so/${block.id.replace(/-/g, '')})\n\n`;
+        break;
+      case 'toggle':
+        blockStr = `${indent}- ${text}\n`;
         break;
       default:
         if (text) blockStr = `${indent}${text}\n\n`;

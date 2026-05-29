@@ -1,39 +1,54 @@
+export function chunkText(text: string, size = 2000): string[] {
+  const chunks: string[] = [];
+  for (let i = 0; i < text.length; i += size) {
+    chunks.push(text.substring(i, i + size));
+  }
+  return chunks;
+}
+
 // Helper to parse simple inline markdown to Notion rich text
 export function parseInlineMarkdown(text: string): any[] {
   const parts: any[] = [];
-  const regex = /(\*\*|__)(.*?)\1|(\*|_)(.*?)\3|(`)(.*?)\5/g;
+  const regex = /(\*\*|__)(.*?)\1|(\*|_)(.*?)\3|(`)(.*?)\5|\[([^\]]+)\]\(([^)]+)\)/g;
   let lastIndex = 0;
   let match;
 
+  const addTextNode = (content: string, annotations?: any, linkUrl?: string) => {
+    if (!content) return;
+    const chunks = chunkText(content, 2000);
+    for (const chunk of chunks) {
+      const node: any = {
+        type: 'text',
+        text: {
+          content: chunk,
+        },
+      };
+      if (annotations) {
+        node.annotations = annotations;
+      }
+      if (linkUrl) {
+        node.text.link = { url: linkUrl };
+      }
+      parts.push(node);
+    }
+  };
+
   while ((match = regex.exec(text)) !== null) {
-    const [, , boldText, , italicText, , codeText] = match;
+    const [, , boldText, , italicText, , codeText, linkText, linkUrl] = match;
 
     // Add preceding plain text
     if (match.index > lastIndex) {
-      parts.push({
-        type: 'text',
-        text: { content: text.substring(lastIndex, match.index) },
-      });
+      addTextNode(text.substring(lastIndex, match.index));
     }
 
     if (boldText) {
-      parts.push({
-        type: 'text',
-        text: { content: boldText },
-        annotations: { bold: true },
-      });
+      addTextNode(boldText, { bold: true });
     } else if (italicText) {
-      parts.push({
-        type: 'text',
-        text: { content: italicText },
-        annotations: { italic: true },
-      });
+      addTextNode(italicText, { italic: true });
     } else if (codeText) {
-      parts.push({
-        type: 'text',
-        text: { content: codeText },
-        annotations: { code: true },
-      });
+      addTextNode(codeText, { code: true });
+    } else if (linkText && linkUrl) {
+      addTextNode(linkText, undefined, linkUrl);
     }
 
     lastIndex = regex.lastIndex;
@@ -41,49 +56,47 @@ export function parseInlineMarkdown(text: string): any[] {
 
   // Add remaining plain text
   if (lastIndex < text.length) {
-    parts.push({
-      type: 'text',
-      text: { content: text.substring(lastIndex) },
-    });
+    addTextNode(text.substring(lastIndex));
   }
 
-  return parts.length > 0 ? parts : [{ type: 'text', text: { content: text } }];
+  return parts.length > 0 ? parts : [{ type: 'text', text: { content: '' } }];
 }
 
 // Convert a markdown block/line into a Notion block object
 export function markdownLineToNotionBlock(line: string): any {
   const trimmed = line.trim();
 
-  if (trimmed.startsWith('# ')) {
+  // 1. Check headings level 1 to 6 (map >=3 to heading_3)
+  const headingMatch = trimmed.match(/^(#{1,6})\s(.*)/);
+  if (headingMatch) {
+    const level = headingMatch[1].length;
+    const content = headingMatch[2];
+    const type = level === 1 ? 'heading_1' : level === 2 ? 'heading_2' : 'heading_3';
     return {
       object: 'block',
-      type: 'heading_1',
-      heading_1: {
-        rich_text: parseInlineMarkdown(trimmed.substring(2)),
+      type: type,
+      [type]: {
+        rich_text: parseInlineMarkdown(content),
       },
     };
   }
 
-  if (trimmed.startsWith('## ')) {
+  // 2. Check checkboxes/todo items first (e.g. - [ ], - [x], [ ], [x])
+  const checklistMatch = trimmed.match(/^[-*]?\s*\[([ xX])\]\s(.*)/);
+  if (checklistMatch) {
+    const checked = checklistMatch[1].toLowerCase() === 'x';
+    const content = checklistMatch[2];
     return {
       object: 'block',
-      type: 'heading_2',
-      heading_2: {
-        rich_text: parseInlineMarkdown(trimmed.substring(3)),
+      type: 'to_do',
+      to_do: {
+        rich_text: parseInlineMarkdown(content),
+        checked: checked,
       },
     };
   }
 
-  if (trimmed.startsWith('### ')) {
-    return {
-      object: 'block',
-      type: 'heading_3',
-      heading_3: {
-        rich_text: parseInlineMarkdown(trimmed.substring(4)),
-      },
-    };
-  }
-
+  // 3. Bullet lists
   if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
     return {
       object: 'block',
@@ -94,6 +107,7 @@ export function markdownLineToNotionBlock(line: string): any {
     };
   }
 
+  // 4. Numbered lists
   if (trimmed.match(/^\d+\.\s/)) {
     const content = trimmed.replace(/^\d+\.\s/, '');
     return {
@@ -105,24 +119,13 @@ export function markdownLineToNotionBlock(line: string): any {
     };
   }
 
+  // 5. Quote
   if (trimmed.startsWith('> ')) {
     return {
       object: 'block',
       type: 'quote',
       quote: {
         rich_text: parseInlineMarkdown(trimmed.substring(2)),
-      },
-    };
-  }
-
-  if (trimmed.startsWith('[ ] ') || trimmed.startsWith('[x] ')) {
-    const checked = trimmed.startsWith('[x] ');
-    return {
-      object: 'block',
-      type: 'to_do',
-      to_do: {
-        rich_text: parseInlineMarkdown(trimmed.substring(4)),
-        checked: checked,
       },
     };
   }
@@ -148,12 +151,16 @@ export function parseMarkdownToBlocks(markdownText: string): any[] {
   for (const line of lines) {
     if (line.trim().startsWith('```')) {
       if (inCodeBlock) {
-        // End of code block
+        // End of code block (chunked to avoid 2000 character limit)
+        const codeChunks = chunkText(codeContent.join('\n'), 2000);
         blocks.push({
           object: 'block',
           type: 'code',
           code: {
-            rich_text: [{ type: 'text', text: { content: codeContent.join('\n') } }],
+            rich_text: codeChunks.map((chunk) => ({
+              type: 'text',
+              text: { content: chunk },
+            })),
             language: codeLanguage || 'javascript',
           },
         });

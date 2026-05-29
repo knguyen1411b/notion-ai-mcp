@@ -300,6 +300,158 @@ server.registerTool(
   }
 );
 
+/**
+ * Tool: notion_search
+ * Search for pages or databases in the workspace.
+ */
+server.registerTool(
+  'notion_search',
+  {
+    description: 'Search for pages and databases in the Notion workspace by title or keyword',
+    inputSchema: z.object({
+      query: z.string().describe('The title or keyword to search for'),
+      apiKey: z.string().optional().describe('Notion API Integration Token (optional)'),
+    }),
+  },
+  async ({ query, apiKey }) => {
+    try {
+      const activeApiKey = apiKey || process.env.NOTION_API_KEY;
+      if (!activeApiKey) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: 'Lỗi: Thiếu NOTION_API_KEY.' }],
+        };
+      }
+
+      const notion = getNotionClient(activeApiKey);
+      const response = await notion.search({
+        query: query,
+        page_size: 20,
+      });
+
+      const results = response.results.map((item: any) => {
+        let title = 'Untitled';
+        if (item.object === 'page') {
+          if (item.properties && item.properties.title && item.properties.title.title) {
+            title = item.properties.title.title.map((t: any) => t.plain_text).join('');
+          } else {
+            const nameProp = Object.values(item.properties).find((p: any) => p.type === 'title');
+            if (nameProp && (nameProp as any).title) {
+              title = (nameProp as any).title.map((t: any) => t.plain_text).join('');
+            }
+          }
+        } else if (item.object === 'database') {
+          if (item.title) {
+            title = item.title.map((t: any) => t.plain_text).join('');
+          }
+        }
+
+        return `- **[${item.object === 'database' ? '📁 Database' : '📄 Page'}] ${title}**\n  ID: \`${item.id}\`\n  URL: ${item.url || 'N/A'}`;
+      });
+
+      const markdown = results.length > 0 
+        ? `🔍 Kết quả tìm kiếm cho: "${query}":\n\n${results.join('\n\n')}`
+        : `🔍 Không tìm thấy trang hoặc database nào khớp với cụm từ: "${query}".`;
+
+      return {
+        content: [{ type: 'text', text: markdown }],
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: `❌ Lỗi khi tìm kiếm: ${error.message}` }],
+      };
+    }
+  }
+);
+
+/**
+ * Tool: notion_create_page
+ * Create a new page under a parent page or database with optional initial content.
+ */
+server.registerTool(
+  'notion_create_page',
+  {
+    description: 'Create a new page under a parent page or database with optional content',
+    inputSchema: z.object({
+      title: z.string().describe('Title of the new page'),
+      parentId: z.string().optional().describe('Notion Page ID or Database ID to create the page under (defaults to NOTION_PAGE_ID env)'),
+      parentType: z.enum(['page', 'database']).optional().default('page').describe('Whether the parent is a page or database'),
+      markdownContent: z.string().optional().describe('Optional initial Markdown content of the new page'),
+      apiKey: z.string().optional().describe('Notion API Integration Token (optional)'),
+    }),
+  },
+  async ({ title, parentId, parentType, markdownContent, apiKey }) => {
+    try {
+      const activeApiKey = apiKey || process.env.NOTION_API_KEY;
+      const activeParentIdRaw = parentId || getDefaultPageId();
+      if (!activeApiKey || !activeParentIdRaw) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: 'Lỗi: Thiếu NOTION_API_KEY hoặc parentId.' }],
+        };
+      }
+
+      const activeParentId = cleanPageId(activeParentIdRaw);
+      const notion = getNotionClient(activeApiKey);
+
+      const parentParam = parentType === 'database' 
+        ? { database_id: activeParentId }
+        : { page_id: activeParentId };
+
+      const properties: any = {};
+      if (parentType === 'database') {
+        properties['Name'] = {
+          title: [{ type: 'text', text: { content: title } }]
+        };
+      } else {
+        properties['title'] = {
+          title: [{ type: 'text', text: { content: title } }]
+        };
+      }
+
+      const children = markdownContent ? parseMarkdownToBlocks(markdownContent) : undefined;
+
+      let page;
+      try {
+        page = await notion.pages.create({
+          parent: parentParam,
+          properties: properties,
+          children: children,
+        });
+      } catch (error: any) {
+        if (parentType === 'database' && error.message.includes('properties')) {
+          properties['title'] = {
+            title: [{ type: 'text', text: { content: title } }]
+          };
+          delete properties['Name'];
+          page = await notion.pages.create({
+            parent: parentParam,
+            properties: properties,
+            children: children,
+          });
+        } else {
+          throw error;
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✅ Tạo trang thành công!\n📄 Tiêu đề: "${title}"\n🆔 ID trang mới: ${page.id}\n🔗 URL: ${(page as any).url || 'N/A'}`
+          }
+        ]
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: `❌ Lỗi khi tạo trang: ${error.message}` }],
+      };
+    }
+  }
+);
+
 // Connect using stdio transport
 async function run() {
   const transport = new StdioServerTransport();

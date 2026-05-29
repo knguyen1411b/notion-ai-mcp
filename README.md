@@ -49,6 +49,19 @@ graph TD
         *   `markdownContent` (required, string): Markdown content to append.
         *   `apiKey` (optional, string)
         *   `pageId` (optional, string)
+5.  **`notion_search`**
+    *   **Description:** Searches for pages and databases in the Notion workspace by title or keyword.
+    *   **Arguments:**
+        *   `query` (required, string): The search term to find.
+        *   `apiKey` (optional, string)
+6.  **`notion_create_page`**
+    *   **Description:** Creates a new page under a parent page or database with optional initial Markdown content.
+    *   **Arguments:**
+        *   `title` (required, string): Title of the new page.
+        *   `parentId` (optional, string): Notion Page ID or Database ID. Defaults to `NOTION_PAGE_ID` env.
+        *   `parentType` (optional, string): Either `'page'` or `'database'`. Defaults to `'page'`.
+        *   `markdownContent` (optional, string): Initial content for the page.
+        *   `apiKey` (optional, string)
 
 ### Getting Started
 
@@ -146,6 +159,19 @@ Tích hợp giao thức **Model Context Protocol (MCP)** cho Notion. Server này
         *   `markdownContent` (bắt buộc, string): Nội dung Markdown cần ghi thêm.
         *   `apiKey` (tùy chọn, string)
         *   `pageId` (tùy chọn, string)
+5.  **`notion_search`**
+    *   **Mô tả:** Tìm kiếm các trang và cơ sở dữ liệu (databases) trong không gian làm việc của Notion theo tiêu đề hoặc từ khóa.
+    *   **Tham số:**
+        *   `query` (bắt buộc, string): Từ khóa tìm kiếm.
+        *   `apiKey` (tùy chọn, string)
+6.  **`notion_create_page`**
+    *   **Mô tả:** Tạo một trang Notion mới bên dưới một trang cha hoặc một database có sẵn với nội dung Markdown ban đầu tùy chọn.
+    *   **Tham số:**
+        *   `title` (bắt buộc, string): Tiêu đề của trang mới.
+        *   `parentId` (tùy chọn, string): ID trang cha hoặc ID Database. Mặc định dùng biến `NOTION_PAGE_ID` trong `.env`.
+        *   `parentType` (tùy chọn, string): Chọn `'page'` hoặc `'database'`. Mặc định là `'page'`.
+        *   `markdownContent` (tùy chọn, string): Nội dung Markdown khởi tạo cho trang mới.
+        *   `apiKey` (tùy chọn, string)
 
 ### Hướng dẫn Cài đặt
 
